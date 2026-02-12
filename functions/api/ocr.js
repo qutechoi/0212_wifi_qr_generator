@@ -1,96 +1,68 @@
+import { GoogleGenAI } from '@google/genai';
+
 export async function onRequest(context) {
-  // CORS headers
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
-  // Handle OPTIONS request for CORS
   if (context.request.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Only allow POST
   if (context.request.method !== 'POST') {
     return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   }
 
   try {
-    // Get API key from environment variable
     const apiKey = context.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.error('GEMINI_API_KEY environment variable not set');
       return new Response(
-        JSON.stringify({
-          error: 'API key not configured. Please set GEMINI_API_KEY in Cloudflare Pages environment variables.'
-        }),
+        JSON.stringify({ error: 'GEMINI_API_KEY not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse request body
     const { imageData } = await context.request.json();
     if (!imageData) {
-      console.error('No image data in request');
       return new Response(
         JSON.stringify({ error: 'No image data provided' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Extract base64 data
     const base64Data = imageData.includes(',') ? imageData.split(',')[1] : imageData;
 
-    // Call Gemini API
-    const prompt = `이 이미지에서 Wi-Fi 네트워크 정보를 추출해주세요.
+    const ai = new GoogleGenAI({ apiKey });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-preview-04-17',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: `이 이미지에서 Wi-Fi 네트워크 정보를 추출해주세요.
 다음 형식으로만 답변해주세요:
 SSID: [와이파이 이름]
 PASSWORD: [비밀번호]
 
-만약 정보를 찾을 수 없다면 "NONE"이라고 답변해주세요.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
+만약 정보를 찾을 수 없다면 "NONE"이라고 답변해주세요.`,
+            },
             {
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: 'image/jpeg',
-                    data: base64Data,
-                  },
-                },
-              ],
+              inlineData: {
+                mimeType: 'image/jpeg',
+                data: base64Data,
+              },
             },
           ],
-        }),
-      }
-    );
+        },
+      ],
+    });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Gemini API error:', response.status, errorText);
-      return new Response(
-        JSON.stringify({
-          error: `Gemini API error: ${response.status}`,
-          details: errorText.substring(0, 200)
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const text = response.text || '';
 
-    const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Parse response
     let ssid = '';
     let password = '';
 
@@ -105,12 +77,9 @@ PASSWORD: [비밀번호]
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Error:', error);
     return new Response(
-      JSON.stringify({
-        error: error.message || 'Unknown error',
-        stack: error.stack?.substring(0, 200)
-      }),
+      JSON.stringify({ error: error.message || 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
