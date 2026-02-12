@@ -20,8 +20,11 @@ export async function onRequest(context) {
     // Get API key from environment variable
     const apiKey = context.env.GEMINI_API_KEY;
     if (!apiKey) {
+      console.error('GEMINI_API_KEY environment variable not set');
       return new Response(
-        JSON.stringify({ error: 'API key not configured' }),
+        JSON.stringify({
+          error: 'API key not configured. Please set GEMINI_API_KEY in Cloudflare Pages environment variables.'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -29,6 +32,7 @@ export async function onRequest(context) {
     // Parse request body
     const { imageData } = await context.request.json();
     if (!imageData) {
+      console.error('No image data in request');
       return new Response(
         JSON.stringify({ error: 'No image data provided' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -36,7 +40,7 @@ export async function onRequest(context) {
     }
 
     // Extract base64 data
-    const base64Data = imageData.split(',')[1];
+    const base64Data = imageData.includes(',') ? imageData.split(',')[1] : imageData;
 
     // Call Gemini API
     const prompt = `이 이미지에서 Wi-Fi 네트워크 정보를 추출해주세요.
@@ -73,9 +77,12 @@ PASSWORD: [비밀번호]
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
+      console.error('Gemini API error:', response.status, errorText);
       return new Response(
-        JSON.stringify({ error: 'Failed to process image' }),
+        JSON.stringify({
+          error: `Gemini API error: ${response.status}`,
+          details: errorText.substring(0, 200)
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -98,9 +105,12 @@ PASSWORD: [비밀번호]
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({
+        error: error.message || 'Unknown error',
+        stack: error.stack?.substring(0, 200)
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
