@@ -26,6 +26,7 @@ function buildWifiQR(ssid, password, hidden = false, auth = 'WPA') {
 }
 
 function App() {
+  const [device, setDevice] = useState(null);
   const [image, setImage] = useState(null);
   const [ocrText, setOcrText] = useState('');
   const [ssid, setSsid] = useState('');
@@ -80,31 +81,75 @@ function App() {
       </div>
 
       <main className="container">
-        <ImageUploader image={image} onChange={setImage} />
-
-        <button className="primary-btn wide" onClick={runOCR} disabled={!image || loading}>
-          {loading ? '인식 중...' : 'OCR 실행'}
-        </button>
-
-        <div className="card">
-          <div className="card-title">인식 결과 (수정 가능)</div>
-          <div className="field">
-            <label>SSID</label>
-            <input value={ssid} onChange={(e) => setSsid(e.target.value)} placeholder="와이파이 이름" />
+        <div className="device-selector">
+          <div className="card-title">기기 선택</div>
+          <div className="device-buttons">
+            <button
+              className={`device-btn${device === 'iphone' ? ' active' : ''}`}
+              onClick={() => setDevice('iphone')}
+            >
+              🍎 iPhone
+            </button>
+            <button
+              className={`device-btn${device === 'android' ? ' active' : ''}`}
+              onClick={() => setDevice('android')}
+            >
+              🤖 Android
+            </button>
           </div>
-          <div className="field">
-            <label>Password</label>
-            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호" />
-          </div>
-          {ocrText && <pre className="ocr">{ocrText}</pre>}
+          {device === 'iphone' && (
+            <p className="device-hint">iPhone은 프로필 설치 방식으로 Wi-Fi에 연결합니다.</p>
+          )}
+          {device === 'android' && (
+            <p className="device-hint">Android는 QR 코드를 카메라로 스캔하여 연결합니다.</p>
+          )}
         </div>
 
-        {qrUrl && (
-          <div className="card center">
-            <div className="card-title">Wi‑Fi QR</div>
-            <img src={qrUrl} alt="wifi qr" className="qr" />
-            <button className="ghost-btn" onClick={downloadQR}>QR 저장</button>
-          </div>
+        {device && (
+          <>
+            <ImageUploader image={image} onChange={setImage} />
+
+            <button className="primary-btn wide" onClick={runOCR} disabled={!image || loading}>
+              {loading ? '인식 중...' : 'OCR 실행'}
+            </button>
+
+            <div className="card">
+              <div className="card-title">인식 결과 (수정 가능)</div>
+              <div className="field">
+                <label>SSID</label>
+                <input value={ssid} onChange={(e) => setSsid(e.target.value)} placeholder="와이파이 이름" />
+              </div>
+              <div className="field">
+                <label>Password</label>
+                <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="비밀번호" />
+              </div>
+              {ocrText && <pre className="ocr">{ocrText}</pre>}
+            </div>
+
+            {device === 'android' && qrUrl && (
+              <div className="card center">
+                <div className="card-title">Wi‑Fi QR</div>
+                <img src={qrUrl} alt="wifi qr" className="qr" />
+                <button className="ghost-btn" onClick={downloadQR}>QR 저장</button>
+              </div>
+            )}
+
+            {device === 'iphone' && ssid && (
+              <div className="card center">
+                <div className="card-title">Wi‑Fi 프로필 설치</div>
+                <p className="profile-desc">
+                  아래 버튼을 누르면 Wi-Fi 설정 프로필이 다운로드됩니다.<br />
+                  설정 → 다운로드된 프로필 → 설치를 진행하세요.
+                </p>
+                <a
+                  className="primary-btn"
+                  href={`/api/mobileconfig?ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}`}
+                >
+                  Wi‑Fi 프로필 설치
+                </a>
+              </div>
+            )}
+          </>
         )}
       </main>
     </div>
