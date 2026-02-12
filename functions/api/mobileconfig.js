@@ -70,8 +70,7 @@ export async function onRequestGet(context) {
 
   return new Response(mobileconfig, {
     headers: {
-      'Content-Type': 'application/x-apple-aspen-config',
-      'Content-Disposition': `attachment; filename="wifi-${ssid}.mobileconfig"`,
+      'Content-Type': 'application/x-apple-aspen-config; charset=utf-8',
     },
   });
 }

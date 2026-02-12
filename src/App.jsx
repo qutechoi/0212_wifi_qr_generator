@@ -138,14 +138,15 @@ function App() {
               <div className="card center">
                 <div className="card-title">Wi‑Fi 프로필 설치</div>
                 <p className="profile-desc">
-                  아래 버튼을 누르면 Wi-Fi 설정 프로필이 다운로드됩니다.<br />
-                  설정 → 다운로드된 프로필 → 설치를 진행하세요.
+                  ⚠️ <strong>Safari 브라우저</strong>에서만 동작합니다.<br />
+                  버튼을 누르면 프로필 다운로드 알림이 표시됩니다.<br />
+                  <strong>설정 → 일반 → VPN 및 기기 관리 → 다운로드된 프로필</strong>에서 설치하세요.
                 </p>
                 <a
                   className="primary-btn"
                   href={`/api/mobileconfig?ssid=${encodeURIComponent(ssid)}&password=${encodeURIComponent(password)}`}
                 >
-                  Wi‑Fi 프로필 설치
+                  Wi‑Fi 프로필 다운로드
                 </a>
               </div>
             )}
