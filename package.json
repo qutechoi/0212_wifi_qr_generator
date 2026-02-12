@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tesseract.js": "^7.0.0"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -1,22 +1,46 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import Tesseract from 'tesseract.js';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import QRCode from 'qrcode';
 import ImageUploader from './components/ImageUploader';
 import './App.css';
 
-function parseWifi(text) {
-  const lines = text.split(/\n|\r/).map((l) => l.trim()).filter(Boolean);
+async function extractWifiFromImage(imageDataUrl, apiKey) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+
+  // Convert data URL to base64
+  const base64Data = imageDataUrl.split(',')[1];
+
+  const prompt = `이 이미지에서 Wi-Fi 네트워크 정보를 추출해주세요.
+다음 형식으로만 답변해주세요:
+SSID: [와이파이 이름]
+PASSWORD: [비밀번호]
+
+만약 정보를 찾을 수 없다면 "NONE"이라고 답변해주세요.`;
+
+  const result = await model.generateContent([
+    prompt,
+    {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64Data,
+      },
+    },
+  ]);
+
+  const text = result.response.text();
+
+  // Parse response
   let ssid = '';
   let password = '';
-  for (const l of lines) {
-    if (!ssid && /ssid|wifi|wi-fi|네트워크|와이파이|와이파이명/i.test(l)) {
-      ssid = l.split(/[:：]/).slice(1).join(':').trim() || '';
-    }
-    if (!password && /password|pass|pw|비밀번호|암호/i.test(l)) {
-      password = l.split(/[:：]/).slice(1).join(':').trim() || '';
-    }
-  }
-  return { ssid, password };
+
+  const ssidMatch = text.match(/SSID:\s*(.+)/i);
+  const passMatch = text.match(/PASSWORD:\s*(.+)/i);
+
+  if (ssidMatch) ssid = ssidMatch[1].trim();
+  if (passMatch) password = passMatch[1].trim();
+
+  return { ssid, password, rawText: text };
 }
 
 function buildWifiQR(ssid, password, hidden = false, auth = 'WPA') {
@@ -31,6 +55,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [qrUrl, setQrUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
 
   const qrText = useMemo(() => (ssid ? buildWifiQR(ssid, password) : ''), [ssid, password]);
 
@@ -40,14 +65,22 @@ function App() {
   }, [qrText]);
 
   const runOCR = async () => {
-    if (!image) return;
+    if (!image || !apiKey) {
+      alert('이미지와 API 키를 모두 입력해주세요.');
+      return;
+    }
     setLoading(true);
     try {
-      const { data } = await Tesseract.recognize(image, 'eng+kor');
-      setOcrText(data.text || '');
-      const parsed = parseWifi(data.text || '');
-      if (parsed.ssid) setSsid(parsed.ssid);
-      if (parsed.password) setPassword(parsed.password);
+      const result = await extractWifiFromImage(image, apiKey);
+      setOcrText(result.rawText || '');
+      if (result.ssid) setSsid(result.ssid);
+      if (result.password) setPassword(result.password);
+
+      // Save API key to localStorage
+      localStorage.setItem('gemini_api_key', apiKey);
+    } catch (error) {
+      console.error('OCR 오류:', error);
+      alert('OCR 처리 중 오류가 발생했습니다: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -74,9 +107,27 @@ function App() {
       </div>
 
       <main className="container">
+        <div className="card">
+          <div className="card-title">Gemini API Key</div>
+          <div className="field">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Gemini API 키 입력"
+            />
+          </div>
+          <small style={{ color: '#666', fontSize: '0.85rem' }}>
+            API 키는 브라우저에만 저장됩니다.
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: '#1a73e8', marginLeft: '4px' }}>
+              키 발급받기
+            </a>
+          </small>
+        </div>
+
         <ImageUploader image={image} onChange={setImage} />
 
-        <button className="primary-btn wide" onClick={runOCR} disabled={!image || loading}>
+        <button className="primary-btn wide" onClick={runOCR} disabled={!image || !apiKey || loading}>
           {loading ? '인식 중...' : 'OCR 실행'}
         </button>
 
